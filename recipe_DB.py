@@ -3,9 +3,14 @@ from bs4 import BeautifulSoup
 import requests
 import random
 
+
+
+##I want to add all the recipe incredients to this database so that they can then be filtered by ingredients, number of calories, 
+# or whatever parameter is needed. File is currently empty.
 connR = sqlite3.connect('RecipeScrape2.sqlite')
 curR = connR.cursor()
 
+## This is the database of over 900 recipe links that was created using spider.py file.
 connL = sqlite3.connect('spider.sqlite')
 curL = connL.cursor()
 
@@ -17,34 +22,26 @@ curL = connL.cursor()
 #curR.execute('''CREATE TABLE IF NOT EXISTS Ingredients
  #   (id INTEGER PRIMARY KEY, url TEXT UNIQUE,Ingredients TEXT, IngAmount INGTEGER, Category TEXT)''')
 
-# Find the ids that send out page rank - we only are interested
-# in pages in the SCC that have in and out links
-
-
-
 
 
 print('---------------------------------------------------------------------------')
 webs = list()
 
+#this connects to Recipe Database and loops through and gets 8 recipes "LIMIT 8"
 curL.execute('''SELECT Url FROM Pages ORDER BY RANDOM() LIMIT 8''')
 for row in curL:
 	web1 = row[0] 
 	webs.append(str(web1))
 
 print(webs)
-#link = requests.get(random.choice(webs)).text 
-
-linklist=["https://themodernproper.com/dressed-up-baked-beans", 
-			 "https://themodernproper.com/chicken-piccata"]
 
 
-
-link2 = "https://themodernproper.com/biscuits-and-gravy"
+#Selects a random link from the webs list -- Next step is using a copy of the weblist and removing that link fromt 
+#he list so it is not selected on the next round. Also add to global filter list so that this recipe is not chosen for the next calendar month.
 html_file = requests.get(random.choice(webs)).text
 
 
-
+#Soup is the raw htmt. To find the tags you need to inspect the elements in the webpage and see what tags and classes you want to pull.
 soup = BeautifulSoup(html_file,'lxml',)
 ingredtags = soup.find_all('span', class_='recipe-ingredients__item--ingredient')
 ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount-inner')
@@ -67,6 +64,7 @@ print("")
 
 print('Time')
 #Retrieve Recipe About - Time Length
+# IMPROVE - When inputing these in Database create a new variable called combined - so it is the Total Time.
 for k, v in zip(time_key,time_value):
 	try:
 		print(k.text, v.text)
@@ -78,7 +76,6 @@ for k, v in zip(time_key,time_value):
 print('')
 
 #Retrieve Ingredient List
-# IMPROVE - Regex to separate the number from ingredient - could connect to servings where user adjust servings to adjust recipe.
 print('Ingredients')
 
 #print(type(ing_amount))
@@ -101,6 +98,7 @@ for words in instructtags:
 	print (words.text)
 
 
+#IMPROVE - If someone wants to seach for something by calories there must be a way to do this. 
 print('Nutritional Information')
 for k, v in zip(nutri_key,nutri_amount):
 	try:

@@ -1,11 +1,12 @@
 from copy import copy
 import sqlite3
 from bs4 import BeautifulSoup
+from numpy import integer
 import requests
 import random
 
-#connR = sqlite3.connect('RecipeScrape2.sqlite')
-connR = sqlite3.connect(':memory:')
+connR = sqlite3.connect('RecipeScrape2.sqlite')
+#connR = sqlite3.connect(':memory:')
 curR = connR.cursor()
 
 connL = sqlite3.connect('spider.sqlite')
@@ -62,7 +63,6 @@ while (x > 0) :
 	html_file1 = random.choice(webs2)
 	html_file = requests.get(html_file1).text
 
-
 	print('-----------------------------8888888888')
 	print('')
 	#THIS WILL REMOVE the chosen file from the temporary list.  To avoid repeats long term you will need 
@@ -75,22 +75,31 @@ while (x > 0) :
 	ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount-inner')
 	instructtags = soup.find_all('div', class_="recipe-method__text-wrapper")
 	atags = soup.find_all('a')
-	title = soup.find_all('h2', class_="recipe-intro__title")
+	title = soup.find('h2', class_="recipe-intro__title")
 	time_key = soup.find_all('span', class_="post-hero__stat--key")
 	time_value = soup.find_all('span', class_="post-hero__stat--value")
 	nutri_key = soup.find_all('span', class_="recipe-nutrition__item-title")
 	nutri_amount = soup.find_all('span', class_="recipe-nutrition__item-amount")
 
+	print(title)
 
 	#INSERT into Recipes_Main --- Here #Insert URL
-	curR.execute('INSERT OR IGNORE INTO Recipes_Main (recipe_url,recipe_title) VALUES (?,?)',(html_file1,title))
-	recipe_id = curR.execute('SELECT recipe_id FROM Recipes_Main WHERE recipe_title =?',(title,))
-	connR.commit()
-	print(recipe_id)
+	
+	recipe_id = integer
+	
 
-	print(title)
+	
+
+	print("Title")
 	#Retrieve Recipe Title
 	for tit in title:
+		curR.execute('INSERT OR IGNORE INTO Recipes_Main (recipe_url,recipe_title) VALUES (?,?)',(html_file1,tit))
+		connR.commit()
+		curR.execute('SELECT recipe_id FROM Recipes_Main WHERE recipe_title =?',(tit,))
+		recipe_id = curR.fetchone()
+		connR.commit()
+		print(recipe_id)
+		
 		print(tit.text)
 
 	print("")
@@ -119,12 +128,15 @@ while (x > 0) :
 	ingredtags = soup.find_all('span', class_='recipe-ingredients__item--ingredient')
 	ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount')
 	for a, i in zip(ing_amount,ingredtags):
+		curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Keys (ingredient_key) VALUES (?)',(i,)) 
+		ingredient_id = curR.execute('SELECT ingredient_id FROM Rec_Ingredients_Keys WHERE ingredient_key=?',(i,))
+		curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Values (ingredient_id,ingredient_value,recipe_id) VALUES (?,?,?)',(ingredient_id,a,recipe_id))
+		connR.commit()
+
 		try:
-			curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Keys (ingredient_key) VALUES (?)',(i,)) 
-			ingredient_id = curR.execute('SELECT ingredient_id FROM Rec_Ingredients_Keys WHERE ingredient_key=?',(i,))
-			curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Values (ingredient_id,ingredient_value,recipe_id) VALUES (?,?,?)',(ingredient_id,a,recipe_id))
-			connR.commit()
 			print(i.text, a.text)
+			
+			
 		except:
 			print(a.text)
 	print('')
@@ -155,7 +167,8 @@ while (x > 0) :
 
 
 
-	
+connL.close()
+connR.close()
 
 print(webs2)
 

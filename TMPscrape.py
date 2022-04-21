@@ -17,9 +17,10 @@ time_value = soup.find_all('span', class_="post-hero__stat--value")
 nutri_key = soup.find_all('span', class_="recipe-nutrition__item-title")
 nutri_amount = soup.find_all('span', class_="recipe-nutrition__item-amount")
 
-
+print('')
 #print(soup)
-print(title)
+print('Title')
+print('')
 #Retrieve Recipe Title
 for tit in title:
 	print(tit.text)

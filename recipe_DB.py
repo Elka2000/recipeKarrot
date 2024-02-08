@@ -4,14 +4,20 @@ from bs4 import BeautifulSoup
 from numpy import integer
 import requests
 import random
+import re
 
-connR = sqlite3.connect('RecipeScrape4.sqlite')
-#connR = sqlite3.connect(':memory:')
+
+
+##These connR variable is making the connection to the SQLite Database file that has the list of ingredients instructions etc.
+connR = sqlite3.connect('RecipeScrape3.sqlite')
+## This curR is imporant, it can be described as a "cursor" it is used to then execute SQL code like in line 22
 curR = connR.cursor()
 
 connL = sqlite3.connect('spider.sqlite')
 curL = connL.cursor()
 
+curL.execute('''CREATE TABLE IF NOT EXISTS scanned
+	(id_url INTEGER PRIMARY KEY,s_url TEXT)''')
 
 
 #Create Main Recipe Table - (Recipe_ID, Rec_Title, Instructions, Recipe URL, Date_Last, Rating) NOTE MAKE SURE DATE TYPE IS CORRECT
@@ -41,23 +47,28 @@ curR.execute('''CREATE TABLE IF NOT EXISTS Rec_Nutrition_Values
    (nutrition_id INTEGER,nutrition_value INTEGER, recipe_id INTEGER)''')
 
 # #CREATE CATEGORY DIET ---- Figure way to take key words from recipe to categories
-curR.execute('''CREATE TABLE IF NOT EXISTS Category_Diet
-   (category_id INTEGER PRIMARY KEY, category TEXT, diet TEXT, recipe_id INTEGER)''')
+curR.execute('''CREATE TABLE IF NOT EXISTS Cat_Keys
+   (cat_key_id INTEGER PRIMARY KEY, category UNIQUE) ''')
+# #CREATE CATEGORY DIET ---- Figure way to take key words from recipe to categories
+curR.execute('''CREATE TABLE IF NOT EXISTS Category_List
+   (category_id INTEGER PRIMARY KEY, cat_key_id, recipe_id INTEGER)''')
 
 
 print('---------------------------------------------------------------------------')
+curL.execute('SELECT COUNT(*) FROM scanned')
+print(curL.fetchone())
 webs = list()
 
 x = int(input("how many recipes "))
-curL.execute('''SELECT Url FROM Pages ORDER BY RANDOM() LIMIT 45''')
+curL.execute('''SELECT Url FROM Pages WHERE Url NOT IN (SELECT s_url FROM scanned)ORDER BY RANDOM() LIMIT 20''')
 for row in curL:
 	web1 = row[0] 
 	webs.append(str(web1))
 
 webs2 = copy(webs)
 print(webs)
-
-
+delete_list =list()
+meat = list()
 
 while (x > 0) :
 	#file1 is created first to first select a random recipe that is then used to to get the html info using "requests"
@@ -74,21 +85,22 @@ while (x > 0) :
 	
 
 	soup = BeautifulSoup(html_file,'lxml',)
-	ingredtags = soup.find_all('span', class_='recipe-ingredients__item--ingredient')
-	ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount-inner')
+	ingredtags = soup.find_all(['a','span'], class_='recipe-ingredients__item--ingredient')
+	ing_amount = soup.find_all(['a','span'], class_='recipe-ingredients__item--amount-inner')
 	instructtags = soup.find_all('div', class_="recipe-method__text-wrapper")
-	atags = soup.find_all('a')
 	title = soup.find('h2', class_="recipe-intro__title")
 	time_key = soup.find_all('span', class_="post-hero__stat--key")
 	time_value = soup.find_all('span', class_="post-hero__stat--value")
 	nutri_key = soup.find_all('span', class_="recipe-nutrition__item-title")
 	nutri_amount = soup.find_all('span', class_="recipe-nutrition__item-amount")
+	category = soup.find_all('a', class_="post-hero__category--link")
 
-	print(title)
 	if title == None: 
 		#Delete URLS that do not have titles - Deletes from spider.sqlite file
+		print(html_file1)
 		curL.execute("DELETE FROM Pages WHERE Url=?",(html_file1,))
-		connL.commit
+		connL.commit()
+		delete_list.append(html_file1)
 
 		print("No Title - Deleted from DB")
 		webs2.remove(html_file1)
@@ -101,6 +113,8 @@ while (x > 0) :
 		print("Title")
 		#Retrieve Recipe Title
 		for tit in title:
+			curL.execute('INSERT OR IGNORE INTO scanned (s_url) VALUES (?)', (html_file1,))
+			connL.commit()
 			curR.execute('INSERT OR IGNORE INTO Recipes_Main (recipe_url,recipe_title) VALUES (?,?)',(html_file1,tit))
 			connR.commit()
 			curR.execute('SELECT recipe_id FROM Recipes_Main WHERE recipe_title =?',(tit,))
@@ -142,11 +156,12 @@ while (x > 0) :
 		print('Ingredients')
 
 		#print(type(ing_amount)) --- Need to figure out how to split measurement from integer (ex. 4 cups, 1/2 lb etc.)
-		ingredtags = soup.find_all('span', class_='recipe-ingredients__item--ingredient')
-		ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount')
+		# # # # ingredtags = soup.find_all('span', class_='recipe-ingredients__item--ingredient')
+		# # # # ing_amount = soup.find_all('span', class_='recipe-ingredients__item--amount')
 		for a, i in zip(ing_amount,ingredtags):
 			try:
-				curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Keys (ingredient_key) VALUES (?)',(i.text.strip(),)) 
+				curR.execute('INSERT OR IGNORE INTO Rec_Ingredients_Keys (ingredient_key) VALUES (?)',(i.text.strip(),))
+				connR.commit() 
 				curR.execute('SELECT ingredient_id FROM Rec_Ingredients_Keys WHERE ingredient_key=?',(i.text,))
 				ingredient_id = curR.fetchone()
 				#print(ingredient_id[0])
@@ -160,14 +175,26 @@ while (x > 0) :
 				print(a.text)
 				print('error - Ingredient')
 		print('')
-
+		[ ]
+			
 		#Retrieve Instructions
 		#IMPROVE - using regex to separate the steps to read better
 		#print('Instructions')
+		
 		for words in instructtags:
 			curR.execute('UPDATE Recipes_Main SET instructions=? WHERE recipe_id=?',(words.text.strip(),recipe_id[0]))
 			connR.commit()
 			print(words.text,1)
+			#meaty = bool(re.search('meat|fish|chicken|turkey|beef|salmon|bacon|sausage|steak|shrimp|prawns|pork|lamb|duck', words.text))
+			#print(meaty)
+			#if meaty == True:
+			#	meat.append(html_file1)
+			#else: continue
+		
+
+			
+	
+			
 
 		print('Nutritional Information')
 		for k, v in zip(nutri_key,nutri_amount):
@@ -185,8 +212,30 @@ while (x > 0) :
 			except:
 				print(k.text, "- Error Nutritional Information")
 
+		# #CREATE CATEGORY DIET ---- Figure way to take key words from recipe to categories
+		#curR.execute('''CREATE TABLE IF NOT EXISTS Cat_Keys
+   		#	(cat_key_id INTEGER PRIMARY KEY, category TEXT) ''')
+		# #CREATE CATEGORY DIET ---- Figure way to take key words from recipe to categories
+		#curR.execute('''CREATE TABLE IF NOT EXISTS Category_List
+   		#	(category_id INTEGER PRIMARY KEY, cat_key_id, recipe_id INTEGER)''')
+
+		print('Categories')
+		#category_list = list()
+		print('')
+		for cat in category:
+			#category_list.append(cat.text)
+			print(cat.text)
+			curR.execute('INSERT OR IGNORE INTO Cat_Keys (category) VALUES (?)',(cat.text,))
+			connR.commit()
+			curR.execute('SELECT cat_key_id FROM Cat_Keys WHERE category=?',(cat.text,))
+			connR.commit()
+			cat_id = curR.fetchone() 
+			curR.execute('INSERT OR IGNORE INTO Category_List (cat_key_id,recipe_id) VALUES (?,?)',(cat_id[0],recipe_id[0]))
+			connR.commit()
+			#print(cat.text)
+		
 		x= x-1
-		print('-DONE-DONE-DONE-DONE-DONE-DONE-DONE-DONE-DONE-DONE-DONE-DONE')
+		print('-RECIPE-ONE-RECIPE-DONE-RECIPE-DONE-RECIPE-DONE-RECIPE-DONE-RECIPE-DONE-')
 		print('')
 
 	webs2.remove(html_file1)
@@ -196,7 +245,10 @@ while (x > 0) :
 connL.close()
 connR.close()
 
-print(webs2)
+#print(webs2)
+print("----------------------SCAN COMPLETE-------------------------")
+print(delete_list)
+#print(meat)
 
 #These are just notes
 
@@ -211,10 +263,5 @@ print(webs2)
 #Connect to test database running on memory to not have to keep deleting database
 # conn = sqlite.connect(':memory:')
 
-
-
-
-
-
-
-
+#what makes more sense - 
+#Category List - compact can be retrieved all at once, how does it look to filter through it, MUST BE INDIVIDUAL cells 

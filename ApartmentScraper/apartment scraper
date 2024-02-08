@@ -1,0 +1,53 @@
+import requests
+from bs4 import BeautifulSoup
+import re
+
+# Set the URL of the website to scrape
+base_url = "https://www.thecharlislc.com"
+start_url = base_url + "/"
+
+# Send a GET request to the website and get the HTML content
+response = requests.get(start_url)
+content = response.content
+
+# Create a BeautifulSoup object to parse the HTML content
+soup = BeautifulSoup(content, 'html.parser')
+
+# Find all the links on the page
+links = soup.find_all('a')
+
+# Loop through each link and search for email addresses and phone numbers
+for link in links:
+    # Get the URL of the link
+    url = link.get('href')
+
+    # Check if the URL is valid
+    if url and (url.startswith(base_url) or url.startswith('/')):
+        if url.startswith('/'):
+            url = base_url + url
+
+        # Send a GET request to the link and get the HTML content
+        response = requests.get(url)
+        content = response.content
+
+        # Create a BeautifulSoup object to parse the HTML content
+        soup = BeautifulSoup(content, 'html.parser')
+
+        # Find all the email addresses on the page
+        emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', str(soup))
+
+        # Find all the phone numbers on the page
+        phone_numbers = re.findall(r'\d{3}-\d{3}-\d{4}', str(soup))
+
+        # Print the results for this link
+        if emails or phone_numbers:
+            print("URL: ", url)
+            if emails:
+                print("Emails:")
+                for email in emails:
+                    print(email)
+            if phone_numbers:
+                print("Phone numbers:")
+                for phone_number in phone_numbers:
+                    print(phone_number)
+            print("\n")

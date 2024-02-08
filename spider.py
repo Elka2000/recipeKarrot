@@ -11,7 +11,7 @@ ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
 
-conn = sqlite3.connect('spider.sqlite')
+conn = sqlite3.connect('dwq2.sqlite')
 cur = conn.cursor()
 
 cur.execute('''CREATE TABLE IF NOT EXISTS Pages
@@ -30,7 +30,7 @@ if row is not None:
     print("Restarting existing crawl.  Remove spider.sqlite to start a fresh crawl.")
 else :
     starturl = input('Enter web url or enter: ')
-    if ( len(starturl) < 1 ) : starturl = 'https://themodernproper.com'
+    if ( len(starturl) < 1 ) : starturl = 'https://deq.utah.gov/health-advisory-panel/'
 
     if ( starturl.endswith('/') ) : starturl = starturl[:-1]
     web = starturl
@@ -38,7 +38,7 @@ else :
         pos = starturl.rfind('/')
         web = starturl[:pos]
 
-    if ( len(web) > 1 ) :
+    if ( len(web) > 1 ):
         cur.execute('INSERT OR IGNORE INTO Webs (url) VALUES ( ? )', ( web, ) )
         cur.execute('INSERT OR IGNORE INTO Pages (url, html, new_rank) VALUES ( ?, NULL, 1.0 )', ( starturl, ) )
         conn.commit()
@@ -101,10 +101,10 @@ while True:
         cur.execute('UPDATE Pages SET error=-1 WHERE url=?', (url, ) )
         conn.commit()
         continue
-
-    cur.execute('INSERT OR IGNORE INTO Pages (url, html, new_rank) VALUES ( ?, NULL, 1.0 )', ( url, ) )
-    cur.execute('UPDATE Pages SET html=? WHERE url=?', (memoryview(html), url ) )
-    conn.commit()
+    if starturl.startswith('https://deq.utah.gov/health-advisory-panel/'):
+        cur.execute('INSERT OR IGNORE INTO Pages (url, html, new_rank) VALUES ( ?, NULL, 1.0 )', ( url, ) )
+        cur.execute('UPDATE Pages SET html=? WHERE url=?', (memoryview(html), url ) )
+        conn.commit()
 
     # Retrieve all of the anchor tags
     tags = soup('a')
